@@ -6,7 +6,13 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Use (default) database if firestoreDatabaseId is not provided
+// @ts-ignore - firestoreDatabaseId might not be in the type definition of the imported JSON
+export const db = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId) 
+  : getFirestore(app);
+
 export const googleProvider = new GoogleAuthProvider();
 
 // Error handling types
@@ -64,10 +70,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Test connection
 async function testConnection() {
   try {
+    // Attempt to read a document to verify Firestore is reachable
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. The client is offline.");
+    if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('Permission denied'))) {
+      console.error("Firebase Connection Error: ", error.message);
+      console.warn("Please ensure that:\n1. Firestore is ENABLED in your Firebase Console (https://console.firebase.google.com/project/smart-todo-list-8eb1e/firestore)\n2. You have created a '(default)' database.\n3. Your Security Rules allow access.");
     }
   }
 }

@@ -1,10 +1,8 @@
 {
-  "projectId": "ai-studio-applet-webapp-93f45",
-  "appId": "1:351826279760:web:818e98bcbdbc6a669b4055",
-  "apiKey": "AIzaSyAgLKn4FxuGjF4gQeq4qXdBYKYm1zap2qg",
-  "authDomain": "ai-studio-applet-webapp-93f45.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-950044a5-5caa-460e-9e15-abab1570a2a7",
-  "storageBucket": "ai-studio-applet-webapp-93f45.firebasestorage.app",
-  "messagingSenderId": "351826279760",
-  "measurementId": ""
+  "apiKey": "AIzaSyB9YR1Jus7XRjC8h2uLgqqa3aI8237j7PU",
+  "authDomain": "smart-todo-list-8eb1e.firebaseapp.com",
+  "projectId": "smart-todo-list-8eb1e",
+  "storageBucket": "smart-todo-list-8eb1e.firebasestorage.app",
+  "messagingSenderId": "820684112816",
+  "appId": "1:820684112816:web:2cbe8e0eafb830b1d6cc75"
 }
