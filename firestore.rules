@@ -1,5 +1,3 @@
-rules_version = '2';
-
 // ===============================================================
 // Assumed Data Model
 // ===============================================================
@@ -11,6 +9,7 @@ rules_version = '2';
 //   - email: string (required)
 //   - displayName: string (optional)
 //   - photoURL: string (optional)
+//   - role: string (optional, e.g., 'admin', 'user')
 //
 // Collection: todos
 // Document ID: {todoId} (auto-generated)
@@ -20,7 +19,7 @@ rules_version = '2';
 //   - completed: bool (required)
 //   - priority: string (required, enum: low, medium, high)
 //   - userId: string (required, matches auth.uid)
-//   - createdAt: number (required)
+//   - createdAt: int (required)
 //
 // ===============================================================
 
@@ -43,6 +42,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+         (request.auth.token.email == "benyapabaibuaw@gmail.com" && request.auth.token.email_verified == true));
+    }
+
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
@@ -56,7 +61,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role']) &&
              data.uid == request.auth.uid &&
              isValidEmail(data.email);
     }
@@ -67,7 +72,7 @@ service cloud.firestore {
              data.completed is bool &&
              data.priority in ['low', 'medium', 'high'] &&
              data.userId == request.auth.uid &&
-             data.createdAt is number;
+             data.createdAt is int;
     }
 
     // ===============================================================
@@ -76,17 +81,17 @@ service cloud.firestore {
 
     // User profiles
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role != 'admin';
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role && isValidUser(request.resource.data)) || isAdmin();
     }
 
     // Todos
     match /todos/{todoId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && isValidTodo(request.resource.data);
-      allow update: if isDocOwner() && isValidTodo(request.resource.data);
-      allow delete: if isDocOwner();
+      allow update: if (isDocOwner() || isAdmin()) && isValidTodo(request.resource.data);
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     // Default deny
