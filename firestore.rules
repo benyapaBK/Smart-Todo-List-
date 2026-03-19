@@ -1,0 +1,95 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId} (matches auth.uid)
+// Fields:
+//   - uid: string (required)
+//   - email: string (required)
+//   - displayName: string (optional)
+//   - photoURL: string (optional)
+//
+// Collection: todos
+// Document ID: {todoId} (auto-generated)
+// Fields:
+//   - id: string (required)
+//   - text: string (required, size < 500)
+//   - completed: bool (required)
+//   - userId: string (required, matches auth.uid)
+//   - createdAt: number (required)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email);
+    }
+
+    function isValidTodo(data) {
+      return hasOnlyAllowedFields(['id', 'text', 'completed', 'userId', 'createdAt']) &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
+             data.completed is bool &&
+             data.userId == request.auth.uid &&
+             data.createdAt is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    // Todos
+    match /todos/{todoId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidTodo(request.resource.data);
+      allow update: if isDocOwner() && isValidTodo(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

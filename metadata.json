@@ -1,0 +1,5 @@
+{
+  "name": "Smart Todo List",
+  "description": "A powerful todo list with Google Authentication and real-time Firebase sync.",
+  "requestFramePermissions": []
+}

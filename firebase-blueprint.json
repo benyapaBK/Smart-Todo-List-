@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "Todo": {
+      "title": "Todo",
+      "description": "A single todo item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["text", "completed", "userId", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/todos/{todoId}": {
+      "schema": "Todo",
+      "description": "Collection of todo items"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    }
+  }
+}
