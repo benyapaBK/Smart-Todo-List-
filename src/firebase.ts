@@ -4,13 +4,13 @@ import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, dele
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
+const config = firebaseConfig as any;
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Use (default) database if firestoreDatabaseId is not provided
-// @ts-ignore - firestoreDatabaseId might not be in the type definition of the imported JSON
-export const db = firebaseConfig.firestoreDatabaseId 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId) 
+export const db = config.firestoreDatabaseId 
+  ? getFirestore(app, config.firestoreDatabaseId) 
   : getFirestore(app);
 
 export const googleProvider = new GoogleAuthProvider();

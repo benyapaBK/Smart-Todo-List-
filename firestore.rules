@@ -18,6 +18,7 @@ rules_version = '2';
 //   - id: string (required)
 //   - text: string (required, size < 500)
 //   - completed: bool (required)
+//   - priority: string (required, enum: low, medium, high)
 //   - userId: string (required, matches auth.uid)
 //   - createdAt: number (required)
 //
@@ -61,9 +62,10 @@ service cloud.firestore {
     }
 
     function isValidTodo(data) {
-      return hasOnlyAllowedFields(['id', 'text', 'completed', 'userId', 'createdAt']) &&
+      return hasOnlyAllowedFields(['id', 'text', 'completed', 'priority', 'userId', 'createdAt']) &&
              data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
              data.completed is bool &&
+             data.priority in ['low', 'medium', 'high'] &&
              data.userId == request.auth.uid &&
              data.createdAt is number;
     }

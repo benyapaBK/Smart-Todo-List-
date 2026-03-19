@@ -8,10 +8,11 @@
         "id": { "type": "string" },
         "text": { "type": "string" },
         "completed": { "type": "boolean" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
         "userId": { "type": "string" },
         "createdAt": { "type": "number" }
       },
-      "required": ["text", "completed", "userId", "createdAt"]
+      "required": ["text", "completed", "priority", "userId", "createdAt"]
     },
     "User": {
       "title": "User",

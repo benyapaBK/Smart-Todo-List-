@@ -32,7 +32,11 @@ import {
   LogIn, 
   Loader2,
   AlertCircle,
-  Check
+  Check,
+  Edit2,
+  Save,
+  X,
+  Flag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -44,10 +48,13 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Types ---
+type Priority = 'low' | 'medium' | 'high';
+
 interface Todo {
   id: string;
   text: string;
   completed: boolean;
+  priority: Priority;
   userId: string;
   createdAt: number;
 }
@@ -112,7 +119,11 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodo, setNewTodo] = useState('');
+  const [newPriority, setNewPriority] = useState<Priority>('medium');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editPriority, setEditPriority] = useState<Priority>('medium');
 
   // Auth Listener
   useEffect(() => {
@@ -132,8 +143,7 @@ function AppContent() {
 
     const q = query(
       collection(db, 'todos'),
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -141,6 +151,16 @@ function AppContent() {
       snapshot.forEach((doc) => {
         items.push({ id: doc.id, ...doc.data() } as Todo);
       });
+      
+      // Sort: Priority (High > Medium > Low) then Date (Newest first)
+      const priorityMap = { high: 0, medium: 1, low: 2 };
+      items.sort((a, b) => {
+        if (priorityMap[a.priority] !== priorityMap[b.priority]) {
+          return priorityMap[a.priority] - priorityMap[b.priority];
+        }
+        return b.createdAt - a.createdAt;
+      });
+      
       setTodos(items);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'todos');
@@ -175,6 +195,7 @@ function AppContent() {
       id: todoId,
       text: newTodo.trim(),
       completed: false,
+      priority: newPriority,
       userId: user.uid,
       createdAt: Date.now(),
     };
@@ -182,6 +203,7 @@ function AppContent() {
     try {
       await setDoc(doc(db, 'todos', todoId), todoData);
       setNewTodo('');
+      setNewPriority('medium');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `todos/${todoId}`);
     } finally {
@@ -199,11 +221,43 @@ function AppContent() {
     }
   };
 
+  const startEditing = (todo: Todo) => {
+    setEditingId(todo.id);
+    setEditText(todo.text);
+    setEditPriority(todo.priority);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editText.trim()) return;
+    try {
+      await updateDoc(doc(db, 'todos', id), {
+        text: editText.trim(),
+        priority: editPriority
+      });
+      setEditingId(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `todos/${id}`);
+    }
+  };
+
   const deleteTodo = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'todos', id));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `todos/${id}`);
+    }
+  };
+
+  const getPriorityColor = (p: Priority) => {
+    switch (p) {
+      case 'high': return 'text-rose-500 bg-rose-50 border-rose-100';
+      case 'medium': return 'text-amber-500 bg-amber-50 border-amber-100';
+      case 'low': return 'text-emerald-500 bg-emerald-50 border-emerald-100';
     }
   };
 
@@ -278,21 +332,43 @@ function AppContent() {
       <main className="max-w-2xl mx-auto px-4 py-12">
         {/* Input Area */}
         <div className="mb-12">
-          <form onSubmit={addTodo} className="relative group">
-            <input 
-              type="text"
-              value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="What needs to be done?"
-              className="w-full px-6 py-5 bg-white rounded-3xl shadow-sm border border-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-300 transition-all text-lg placeholder:text-zinc-300"
-            />
-            <button 
-              type="submit"
-              disabled={!newTodo.trim() || isAdding}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 bg-zinc-900 text-white rounded-2xl flex items-center justify-center hover:bg-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-300 transition-all active:scale-90"
-            >
-              {isAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
-            </button>
+          <form onSubmit={addTodo} className="bg-white rounded-3xl shadow-sm border border-zinc-100 p-2 flex flex-col gap-2">
+            <div className="relative flex items-center">
+              <input 
+                type="text"
+                value={newTodo}
+                onChange={(e) => setNewTodo(e.target.value)}
+                placeholder="What needs to be done?"
+                className="w-full px-6 py-4 bg-transparent focus:outline-none text-lg placeholder:text-zinc-300"
+              />
+              <button 
+                type="submit"
+                disabled={!newTodo.trim() || isAdding}
+                className="mr-2 w-12 h-12 bg-zinc-900 text-white rounded-2xl flex items-center justify-center hover:bg-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-300 transition-all active:scale-90"
+              >
+                {isAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
+              </button>
+            </div>
+            <div className="px-4 pb-2 flex items-center gap-4 border-t border-zinc-50 pt-2">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Priority:</span>
+              <div className="flex gap-2">
+                {(['low', 'medium', 'high'] as Priority[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setNewPriority(p)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium border transition-all capitalize",
+                      newPriority === p 
+                        ? getPriorityColor(p)
+                        : "text-zinc-400 bg-zinc-50 border-zinc-100 hover:border-zinc-200"
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
           </form>
         </div>
 
@@ -329,33 +405,98 @@ function AppContent() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   className={cn(
-                    "group flex items-center gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm transition-all hover:border-zinc-200",
+                    "group flex flex-col gap-2 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm transition-all hover:border-zinc-200",
                     todo.completed && "bg-zinc-50/50 opacity-75"
                   )}
                 >
-                  <button 
-                    onClick={() => toggleTodo(todo)}
-                    className={cn(
-                      "w-6 h-6 rounded-lg flex items-center justify-center transition-all",
-                      todo.completed ? "bg-emerald-500 text-white" : "border-2 border-zinc-200 text-transparent hover:border-zinc-400"
-                    )}
-                  >
-                    {todo.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                  </button>
-                  
-                  <span className={cn(
-                    "flex-1 text-zinc-700 transition-all",
-                    todo.completed && "line-through text-zinc-400"
-                  )}>
-                    {todo.text}
-                  </span>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => toggleTodo(todo)}
+                      className={cn(
+                        "w-6 h-6 rounded-lg flex items-center justify-center transition-all shrink-0",
+                        todo.completed ? "bg-emerald-500 text-white" : "border-2 border-zinc-200 text-transparent hover:border-zinc-400"
+                      )}
+                    >
+                      {todo.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                    </button>
+                    
+                    {editingId === todo.id ? (
+                      <div className="flex-1 flex flex-col gap-2">
+                        <input 
+                          autoFocus
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-200 focus:outline-none focus:border-zinc-400"
+                        />
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-2">
+                            {(['low', 'medium', 'high'] as Priority[]).map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => setEditPriority(p)}
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all capitalize",
+                                  editPriority === p 
+                                    ? getPriorityColor(p)
+                                    : "text-zinc-400 bg-zinc-50 border-zinc-100"
+                                )}
+                              >
+                                {p}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={() => saveEdit(todo.id)}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            >
+                              <Save className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={cancelEditing}
+                              className="p-1.5 text-zinc-400 hover:bg-zinc-100 rounded-lg transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 flex flex-col gap-1">
+                          <span className={cn(
+                            "text-zinc-700 transition-all font-medium",
+                            todo.completed && "line-through text-zinc-400"
+                          )}>
+                            {todo.text}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-tighter",
+                              getPriorityColor(todo.priority)
+                            )}>
+                              {todo.priority}
+                            </span>
+                          </div>
+                        </div>
 
-                  <button 
-                    onClick={() => deleteTodo(todo.id)}
-                    className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button 
+                            onClick={() => startEditing(todo)}
+                            className="p-2 text-zinc-300 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteTodo(todo.id)}
+                            className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               ))
             )}
