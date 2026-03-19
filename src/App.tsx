@@ -172,8 +172,19 @@ function AppContent() {
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        alert(
+          "Firebase Error: Unauthorized Domain\n\n" +
+          "Please add these domains to your Firebase Authentication settings:\n" +
+          "1. ais-dev-zlu6smvdrlatih7worehd6-219413738297.asia-east1.run.app\n" +
+          "2. ais-pre-zlu6smvdrlatih7worehd6-219413738297.asia-east1.run.app\n\n" +
+          "Go to: Firebase Console > Authentication > Settings > Authorized domains"
+        );
+      } else {
+        alert("Login failed: " + error.message);
+      }
     }
   };
 
