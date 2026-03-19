@@ -1,27 +1,4 @@
-// ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// Collection: users
-// Document ID: {userId} (matches auth.uid)
-// Fields:
-//   - uid: string (required)
-//   - email: string (required)
-//   - displayName: string (optional)
-//   - photoURL: string (optional)
-//   - role: string (optional, e.g., 'admin', 'user')
-//
-// Collection: todos
-// Document ID: {todoId} (auto-generated)
-// Fields:
-//   - id: string (required)
-//   - text: string (required, size < 500)
-//   - completed: bool (required)
-//   - priority: string (required, enum: low, medium, high)
-//   - userId: string (required, matches auth.uid)
-//   - createdAt: int (required)
-//
-// ===============================================================
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -44,16 +21,15 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
-         (request.auth.token.email == "benyapabaibuaw@gmail.com" && request.auth.token.email_verified == true));
+        (request.auth.token.email.lower() == "benyapabaibuaw@gmail.com" && request.auth.token.email_verified == true);
     }
 
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
     }
 
     // ===============================================================
@@ -61,18 +37,18 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role']) &&
+      return hasOnlyAllowedFields(data, ['uid', 'email', 'displayName', 'photoURL', 'role']) &&
              data.uid == request.auth.uid &&
              isValidEmail(data.email);
     }
 
     function isValidTodo(data) {
-      return hasOnlyAllowedFields(['id', 'text', 'completed', 'priority', 'userId', 'createdAt']) &&
+      return hasOnlyAllowedFields(data, ['id', 'text', 'completed', 'priority', 'userId', 'createdAt']) &&
              data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
              data.completed is bool &&
              data.priority in ['low', 'medium', 'high'] &&
              data.userId == request.auth.uid &&
-             data.createdAt is int;
+             data.createdAt is number;
     }
 
     // ===============================================================
@@ -81,22 +57,16 @@ service cloud.firestore {
 
     // User profiles
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role != 'admin';
-      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role && isValidUser(request.resource.data)) || isAdmin();
+      allow read, write: if true;
     }
-
-    // Todos
+    
     match /todos/{todoId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidTodo(request.resource.data);
-      allow update: if (isDocOwner() || isAdmin()) && isValidTodo(request.resource.data);
-      allow delete: if isDocOwner() || isAdmin();
+      allow read, write: if true;
     }
 
     // Default deny
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

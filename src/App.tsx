@@ -13,6 +13,7 @@ import {
   collection, 
   doc, 
   setDoc, 
+  getDoc,
   deleteDoc, 
   updateDoc, 
   onSnapshot, 
@@ -134,6 +135,37 @@ function AppContent() {
     return () => unsubscribe();
   }, []);
 
+  // Sync User Document
+  useEffect(() => {
+    if (!user) return;
+
+    const syncUser = async () => {
+      const userRef = doc(db, 'users', user.uid);
+      try {
+        console.log(`[Firestore] Syncing user document for ${user.uid}...`);
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+          console.log(`[Firestore] User document does not exist. Creating...`);
+          await setDoc(userRef, {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            role: 'user' // Default role
+          });
+          console.log(`[Firestore] User document created successfully.`);
+        } else {
+          console.log(`[Firestore] User document already exists.`);
+        }
+      } catch (error) {
+        console.error("Failed to sync user document", error);
+        handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+      }
+    };
+
+    syncUser();
+  }, [user]);
+
   // Firestore Sync
   useEffect(() => {
     if (!user) {
@@ -149,20 +181,24 @@ function AppContent() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: Todo[] = [];
       snapshot.forEach((doc) => {
-        items.push({ id: doc.id, ...doc.data() } as Todo);
+        const data = doc.data();
+        items.push({ ...data, id: doc.id } as Todo);
       });
+      
+      console.log(`[Firestore] Received ${items.length} todos for user ${user.uid}`);
       
       // Sort: Priority (High > Medium > Low) then Date (Newest first)
       const priorityMap = { high: 0, medium: 1, low: 2 };
       items.sort((a, b) => {
-        if (priorityMap[a.priority] !== priorityMap[b.priority]) {
-          return priorityMap[a.priority] - priorityMap[b.priority];
-        }
-        return b.createdAt - a.createdAt;
+        const pA = priorityMap[a.priority] ?? 1;
+        const pB = priorityMap[b.priority] ?? 1;
+        if (pA !== pB) return pA - pB;
+        return (b.createdAt || 0) - (a.createdAt || 0);
       });
       
       setTodos(items);
     }, (error) => {
+      console.error("[Firestore] Subscription error:", error);
       handleFirestoreError(error, OperationType.LIST, 'todos');
     });
 
@@ -212,10 +248,13 @@ function AppContent() {
     };
 
     try {
+      console.log(`[Firestore] Creating todo ${todoId}...`);
       await setDoc(doc(db, 'todos', todoId), todoData);
+      console.log(`[Firestore] Todo ${todoId} created successfully.`);
       setNewTodo('');
       setNewPriority('medium');
     } catch (error) {
+      console.error("[Firestore] Create error:", error);
       handleFirestoreError(error, OperationType.CREATE, `todos/${todoId}`);
     } finally {
       setIsAdding(false);
